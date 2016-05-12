@@ -1,5 +1,5 @@
 # Natural Born Killers
-Natural Born Killers v0.01 :: A KINGPIN: Life of Crime (TM) Serverside Modification
+Natural Born Killers v1.27 :: A KINGPIN: Life of Crime (TM) Serverside Modification
 
 KINGPIN: Life of Crime (TM) - SDK SOFTWARE USE LIMITATIONS AND LIMITED LICENSE GENERAL PRODUCT LICENSE.
 
