@@ -1,0 +1,1 @@
+#include <ansi_prefix.win32.h>#define C_ONLY
