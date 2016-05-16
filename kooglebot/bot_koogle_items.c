@@ -58,8 +58,23 @@ qboolean KOOGLEIT_IsReachable(edict_t *self, vec3_t goal)
 	trace_t trace;
 	vec3_t v;
 
+	vec3_t	spot1;
+	vec3_t	spot2;
+
+	VectorCopy(self->s.origin, spot1);
+	spot1[2] += self->viewheight;
+
+	VectorCopy(goal, spot2);
+
+	trace = gi.trace(spot1, vec3_origin, vec3_origin, spot2, self, MASK_ALPHA);
+
+	if (trace.fraction == 1.0)
+		return false;
+
 	VectorCopy(self->mins, v);
-	v[2] += 18; // Stepsize
+
+	// Stepsize
+	v[2] += 18;
 
 	trace = gi.trace(self->s.origin, v, self->maxs, goal, self, MASK_OPAQUE);
 
@@ -73,9 +88,32 @@ qboolean KOOGLEIT_IsReachable(edict_t *self, vec3_t goal)
 ///////////////////////////////////////////////////////////////////////
 // Visiblilty check 
 ///////////////////////////////////////////////////////////////////////
-qboolean KOOGLEIT_IsVisible(edict_t *self, vec3_t goal)
+qboolean KOOGLEIT_IsMaskAlpha(edict_t *self, vec3_t goal)
 {
 	trace_t trace;
+	trace = gi.trace(self->s.origin, vec3_origin, vec3_origin, goal, self, MASK_ALPHA);
+
+	if (trace.fraction == 1.0)
+		return true;
+	else
+		return false;
+}
+
+qboolean KOOGLEIT_IsVisible(edict_t *self, vec3_t goal)
+{
+	vec3_t	spot1;
+	vec3_t	spot2;
+	trace_t	trace;
+
+	VectorCopy(self->s.origin, spot1);
+	spot1[2] += self->viewheight;
+
+	VectorCopy(goal, spot2);
+
+	trace = gi.trace(spot1, vec3_origin, vec3_origin, spot2, self, MASK_ALPHA);
+
+	if (trace.fraction == 1.0)
+		return false;
 
 	trace = gi.trace(self->s.origin, vec3_origin, vec3_origin, goal, self, MASK_OPAQUE);
 
@@ -675,6 +713,12 @@ void KOOGLEIT_BuildItemNodeTable(qboolean rebuild)
 		if (items->solid == SOLID_NOT)
 			continue;
 
+		if (strcmp(items->classname, "func_wall") == 0)
+			continue;
+
+		if (strcmp(items->classname, "noclass") == 0)
+			continue;
+
 		if (!items->classname)
 			continue;
 
@@ -742,7 +786,8 @@ void KOOGLEIT_BuildItemNodeTable(qboolean rebuild)
 						v[2] += 16;
 
 					if (nodes[i].type == BOTNODE_CROUCH)
-						v[2] += 16;
+						v[2] += 24; // was 16
+
 
 					if (nodes[i].type == BOTNODE_JUMP)
 						v[2] += 64; // step size 64

@@ -211,6 +211,7 @@ void KOOGLECM_Store();
 // bot_koogle_items.c protos
 void KOOGLEIT_PlayerAdded(edict_t *ent);
 void KOOGLEIT_PlayerRemoved(edict_t *ent);
+qboolean KOOGLEIT_IsMaskAlpha(edict_t * self, vec3_t goal);
 qboolean KOOGLEIT_IsVisible(edict_t *self, vec3_t goal);
 qboolean KOOGLEIT_IsReachable(edict_t *self, vec3_t goal);
 qboolean KOOGLEIT_ChangeWeapon(edict_t *ent, gitem_t *item);
@@ -219,11 +220,14 @@ float KOOGLEIT_ItemNeed(edict_t *self, int item);
 int KOOGLEIT_ClassnameToIndex(char *classname);
 void KOOGLEIT_BuildItemNodeTable(qboolean rebuild);
 
+
 // bot_koogle_movement.c protos
 qboolean KOOGLEMV_SpecialMove(edict_t *self, usercmd_t *ucmd);
+void KOOGLEMV_ChangeBotAngle(edict_t * ent);
 void KOOGLEMV_Move(edict_t *self, usercmd_t *ucmd);
 void KOOGLEMV_Attack(edict_t *self, usercmd_t *ucmd);
 void KOOGLEMV_Wander(edict_t *self, usercmd_t *ucmd);
+qboolean KOOGLEMV_CanMove(edict_t * self, int direction);
 
 // bot_koogle_nodes.c protos
 int KOOGLEND_FindCost(short int from, short int to);

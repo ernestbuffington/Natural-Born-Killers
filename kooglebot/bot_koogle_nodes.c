@@ -81,10 +81,16 @@ int KOOGLEND_FindCloseReachableNode(edict_t *self, int range, int type)
 
 			if (dist < range) // square range instead of sqrt
 			{
+				// KOOGLEBOT_ADD added 5/13/2016 by Ghost 
+				// Hack to keep bots from spinning and trying to find nodes through alpha bridges! 
 				// make sure it is visible
+				tr = gi.trace(self->s.origin, self->mins, self->maxs, nodes[i].origin, self, MASK_ALPHA);
+				if (tr.fraction == 1.0)
+					continue; 
+				// KOOGLEBOT_END added 5/13/2016 by Ghost
+
 				//trace = gi.trace (self->s.origin, vec3_origin, vec3_origin, nodes[i].origin, self, MASK_OPAQUE);
 				tr = gi.trace(self->s.origin, self->mins, self->maxs, nodes[i].origin, self, MASK_OPAQUE);
-
 				if (tr.fraction == 1.0)
 					return i;
 			}
@@ -104,7 +110,7 @@ int KOOGLEND_FindClosestReachableNode(edict_t *self, int range, int type)
 	float dist;
 	int node = -1;
 	vec3_t v;
-	trace_t tr;
+	trace_t tr, zr;
 	float rng;
 	vec3_t maxs, mins;
 
@@ -133,8 +139,9 @@ int KOOGLEND_FindClosestReachableNode(edict_t *self, int range, int type)
 			if (dist < closest && dist < rng)
 			{
 				// make sure it is visible
+				zr = gi.trace(self->s.origin, mins, maxs, nodes[i].origin, self, MASK_ALPHA);
 				tr = gi.trace(self->s.origin, mins, maxs, nodes[i].origin, self, MASK_OPAQUE);
-				if (tr.fraction == 1.0)
+				if ((tr.fraction == 1.0) || (zr.fraction == 1.0))
 				{
 					node = i;
 					closest = dist;
@@ -331,13 +338,19 @@ void KOOGLEND_PathMap(edict_t *self)
 	if (gi.pointcontents(v) & (CONTENTS_LAVA | CONTENTS_SLIME))
 		return; // no nodes in slime
 
+	// added to stop spinning under alpha bridges - does not seem to werk
+	//VectorCopy(self->s.origin, v);
+	//v[2] -= 18;
+	//if (gi.pointcontents(v) & (MASK_ALL))
+	//	return; // no nodes in slime
+
 	////////////////////////////////////////////////////////
 	// Jumping
 	////////////////////////////////////////////////////////
-	if (self->is_jumping)
+	if (self->is_jumping == true)
 	{
 		// See if there is a close by jump landing node (prevent adding too many)
-		closest_node = KOOGLEND_FindClosestReachableNode(self, 64, BOTNODE_JUMP);
+		closest_node = KOOGLEND_FindClosestReachableNode(self, 24, BOTNODE_JUMP);
 
 		if (closest_node == INVALID)
 			closest_node = KOOGLEND_AddNode(self, BOTNODE_JUMP);
@@ -345,10 +358,10 @@ void KOOGLEND_PathMap(edict_t *self)
 		// Now add link
 		if (self->last_node != -1)
 			KOOGLEND_UpdateNodeEdge(self->last_node, closest_node);
-
-		self->is_jumping = true;
+		//self->is_jumping = false;
 		return;
 	}
+
 	/*
 	////////////////////////////////////////////////////////////
 	// Grapple
@@ -385,12 +398,30 @@ void KOOGLEND_PathMap(edict_t *self)
 		if (self->waterlevel)
 			closest_node = KOOGLEND_AddNode(self, BOTNODE_WATER);
 		else
-			closest_node = KOOGLEND_AddNode(self, BOTNODE_MOVE);
-
+		{
+			// KOOGLEBOT_ADD added 4/29/2016 by Ghost
+			if (self->update_node == BOTNODE_MOVE)
+			   closest_node = KOOGLEND_AddNode(self, BOTNODE_MOVE);
+			// KOOGLEBOT_END added 4/29/2016 by Ghost
+			else
+			// KOOGLEBOT_ADD added 4/29/2016 by Ghost
+			if (self->update_node == BOTNODE_LADDER)
+				closest_node = KOOGLEND_AddNode(self, BOTNODE_LADDER); 
+			// KOOGLEBOT_END added 4/29/2016 by Ghost
+			else
+			// KOOGLEBOT_ADD added 4/29/2016 by Ghost
+			if (self->update_node == BOTNODE_CROUCH)
+				closest_node = KOOGLEND_AddNode(self, BOTNODE_CROUCH); 
+			// KOOGLEBOT_END added 4/29/2016 by Ghost
+			else
+			// KOOGLEBOT_ADD added 4/29/2016 by Ghost
+			if (self->update_node == BOTNODE_JUMP)
+				closest_node = KOOGLEND_AddNode(self, BOTNODE_JUMP); 
+			// KOOGLEBOT_END added 4/29/2016 by Ghost
+		}
 		// Now add link
-		if (self->last_node != -1)
-			KOOGLEND_UpdateNodeEdge(self->last_node, closest_node);
-
+			if (self->last_node != -1)
+				KOOGLEND_UpdateNodeEdge(self->last_node, closest_node);
 	}
 	else if (closest_node != self->last_node && self->last_node != INVALID)
 		KOOGLEND_UpdateNodeEdge(self->last_node, closest_node);
@@ -692,7 +723,7 @@ void KOOGLEND_SaveNodes()
 	gi.dprintf("Saving node table...");
 	strcpy(filename, MODDIR"\\"BOTDIR"\\");
 	strcat(filename, level.mapname);
-	strcat(filename, ".nod");
+	strcat(filename, ".nav");
 	if ((pOut = fopen(filename, "wb")) == NULL)
 	return; // bail
 	fwrite(&version, sizeof(int), 1, pOut); // write version
@@ -719,7 +750,7 @@ void KOOGLEND_LoadNodes(void)
 
 	strcpy(filename, MODDIR"\\"BOTDIR"\\");
 	strcat(filename, level.mapname);
-	strcat(filename, ".nod");
+	strcat(filename, ".nav");
 
 	if ((pIn = fopen(filename, "rb")) == NULL)
 	{

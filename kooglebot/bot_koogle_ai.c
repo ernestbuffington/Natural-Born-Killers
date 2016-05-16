@@ -198,25 +198,25 @@ void KOOGLEAI_PickLongRangeGoal(edict_t *self)
 		else // freeforall lets not go quite as hard after the players!
 			weight = 0.3;
 
-		// note: this is what we use to declare money already belongs to our team
-		//if (cash->style != self->client->pers.team)
+			// note: this is what we use to declare money already belongs to our team
+			//if (cash->style != self->client->pers.team)
 
-		/*
-		// Player carrying the flag?
-		if(teamplay->value && (players[i]->client->pers.inventory[ITEMLIST_FLAG2] || players[i]->client->pers.inventory[ITEMLIST_FLAG1]))
-		weight = 2.0;
-		else*/
-		//weight = 0.3;
+			/*
+			// Player carrying the flag?
+			if(teamplay->value && (players[i]->client->pers.inventory[ITEMLIST_FLAG2] || players[i]->client->pers.inventory[ITEMLIST_FLAG1]))
+			weight = 2.0;
+			else*/
+			//weight = 0.3;
 
-		weight *= random(); // Allow random variations
-		weight /= cost; // Check against cost of getting there
+			weight *= random(); // Allow random variations
+			weight /= cost; // Check against cost of getting there
 
-		if (weight > best_weight)
-		{
-			best_weight = weight;
-			goal_node = node;
-			goal_ent = players[i];
-		}
+			if (weight > best_weight)
+			{
+				best_weight = weight;
+				goal_node = node;
+				goal_ent = players[i];
+			}
 	}
 
 	// If do not find a goal, go wandering to find a goal....
@@ -232,7 +232,7 @@ void KOOGLEAI_PickLongRangeGoal(edict_t *self)
 		//	gi.dprintf("%s is looking for LR goal, wandering.\n", self->client->pers.netname);
 		//	gi.dprintf("-------------------------------------------------------------------------\n");
 		//}
-	
+
 
 		return; // no path?
 	}
@@ -272,6 +272,7 @@ void KOOGLEAI_PickShortRangeGoal(edict_t *self)
 
 	while (target)
 	{
+		
 		if (target->classname == NULL)
 			return;
 
@@ -291,6 +292,16 @@ void KOOGLEAI_PickShortRangeGoal(edict_t *self)
 			return;
 		}
 
+		if (KOOGLEIT_IsMaskAlpha(self, target->s.origin))
+		{
+			index = KOOGLEIT_ClassnameToIndex(target->classname);
+			weight = KOOGLEIT_ItemNeed(self, index);
+
+
+			best_weight = 0.0;
+			best = target;
+	    }
+		else  
 		if (KOOGLEIT_IsReachable(self, target->s.origin))
 		{
 			if (infront(self, target))
@@ -304,12 +315,12 @@ void KOOGLEAI_PickShortRangeGoal(edict_t *self)
 					best = target;
 				}
 			}
+		
 		}
 
 		// next target
-		target = findradius(target, self->s.origin, 200);
-		//rnd = random() * 199;
-		//target = findradius(target, self->s.origin, rnd);
+		rnd = random() * 199;
+		target = findradius(target, self->s.origin, rnd);
 	}
 
 	if (best_weight)

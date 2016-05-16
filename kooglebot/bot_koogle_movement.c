@@ -29,6 +29,9 @@ qboolean KOOGLEMV_CanMove(edict_t *self, int direction)
 	else if (direction == MOVE_BACK)
 		angles[1] -= 180;
 
+	self->update_node = BOTNODE_JUMP;
+	self->is_jumping = true;
+
 	// Set up the vectors
 	AngleVectors(angles, forward, right, NULL);
 
@@ -61,6 +64,7 @@ qboolean KOOGLEMV_SpecialMove(edict_t *self, usercmd_t *ucmd)
 	vec3_t dir, forward, right, start, end, offset;
 	vec3_t top;
 	trace_t tr;
+	vec3_t dist;
 
 	// Get current direction
 	VectorCopy(self->client->ps.viewangles, dir);
@@ -91,8 +95,6 @@ qboolean KOOGLEMV_SpecialMove(edict_t *self, usercmd_t *ucmd)
 		// Crouch
 		if (!tr.allsolid)
 		{
-
-			//here
 			ucmd->forwardmove = 400;
 			ucmd->upmove = -400;
 			return true;
@@ -105,8 +107,13 @@ qboolean KOOGLEMV_SpecialMove(edict_t *self, usercmd_t *ucmd)
 
 		if (!tr.allsolid)
 		{
+			self->is_jumping = true;
+			// Set up a jump move
 			ucmd->forwardmove = 400;
 			ucmd->upmove = 400;
+			KOOGLEMV_ChangeBotAngle(self);
+			VectorCopy(self->move_vector, dist);
+			VectorScale(dist, 440, self->velocity);
 			return true;
 		}
 	}
@@ -118,7 +125,7 @@ qboolean KOOGLEMV_SpecialMove(edict_t *self, usercmd_t *ucmd)
 ///////////////////////////////////////////////////////////////////////
 // Checks for obstructions in front of bot
 //
-// This is a function I created origianlly for KOOGLE that
+// This is a function I created originally for KOOGLE that
 // tries to help steer the bot around obstructions.
 //
 // If the move is resolved here, this function returns true.
@@ -129,17 +136,61 @@ qboolean KOOGLEMV_CheckEyes(edict_t *self, usercmd_t *ucmd)
 	vec3_t  leftstart, rightstart, focalpoint;
 	vec3_t  upstart, upend;
 	vec3_t  dir, offset;
-
+	vec3_t start, end, endp;
+	vec3_t up;
+	trace_t tr;
 	trace_t traceRight, traceLeft, traceUp, traceFront; // for eyesight
-														// Get current angle and set up "eyes"
+
+	/*
+	AngleVectors(self->owner->client->v_angle, forward, right, up);
+
+	VectorSet(offset, 24, 6, self->owner->viewheight - 7);
+	G_ProjectSource(self->owner->s.origin, offset, forward, right, start);
+	VectorMA(start, 8192, forward, end);
+
+	tr = gi.trace(start, NULL, NULL, end, self->owner, CONTENTS_SOLID | CONTENTS_MONSTER | CONTENTS_DEADMONSTER);
+
+	if (tr.fraction != 1) 
+	{
+		VectorMA(tr.endpos, -4, forward, endp);
+		VectorCopy(endp, tr.endpos);
+	}
+
+	if ((tr.ent->svflags & SVF_MONSTER) || (tr.ent->client)) 
+	{
+		if ((tr.ent->takedamage) && (tr.ent != self->owner)) 
+		{
+			self->s.skinnum = 1;
+		}
+	}
+	else
+		self->s.skinnum = 0;
+
+	vectoangles(tr.plane.normal, self->s.angles);
+	VectorCopy(tr.endpos, self->s.origin);
+
+	gi.linkentity(self);
+	self->nextthink = level.time + 0.1;
+
+	*/
+
+	// Get current angle and set up "eyes"
 	VectorCopy(self->s.angles, dir);
 	AngleVectors(dir, forward, right, NULL);
 
+
+	/* vec3_t offset is the 1st number */
+	/* 200 is the 2nd number ( move forward 200 ) */
+	/* 0 is the 3rd number is ( move to the right) */
+	/* view height is the 4th number (actual view height) */
+
 	// Let them move to targets by walls
 	if (!self->movetarget)
-		VectorSet(offset, 200, 0, 4); // focalpoint 
-	else
-		VectorSet(offset, 36, 0, 4);  // focalpoint 
+	{                   
+		VectorSet(offset, 200, 0, 4); 
+	}                       
+	
+	VectorSet(offset, 36, 0, 4); // focalpoint 
 
 	G_ProjectSource(self->s.origin, offset, forward, right, focalpoint);
 
@@ -167,13 +218,13 @@ qboolean KOOGLEMV_CheckEyes(edict_t *self, usercmd_t *ucmd)
 	G_ProjectSource(self->s.origin, offset, forward, right, leftstart);
 
 	offset[1] -= 36; // want to make sure this is correct
-					 // VectorSet(offset, 0, -18, 4);
+	//VectorSet(offset, 0, -18, 4);
 	G_ProjectSource(self->s.origin, offset, forward, right, rightstart);
 
 	traceRight = gi.trace(rightstart, NULL, NULL, focalpoint, self, MASK_OPAQUE);
 	traceLeft = gi.trace(leftstart, NULL, NULL, focalpoint, self, MASK_OPAQUE);
 
-	// Wall checking code, this will degenerate progressivly so the least cost 
+	// Wall checking code, this will degenerate progressively so the least cost 
 	// check will be done first.
 
 	// If open space move ok
@@ -329,9 +380,10 @@ void KOOGLEMV_MoveToGoal(edict_t *self, usercmd_t *ucmd)
 void KOOGLEMV_Move(edict_t *self, usercmd_t *ucmd)
 {
 	vec3_t dist;
-	int current_node_type = -1;
-	int next_node_type = -1;
+	int current_node_type =-1;
+	int next_node_type =-1;
 	int i;
+	float c;
 
 	// Get current and next node back from nav code.
 	if (!KOOGLEND_FollowPath(self))
@@ -360,7 +412,7 @@ void KOOGLEMV_Move(edict_t *self, usercmd_t *ucmd)
 	//ucmd->buttons = BUTTON_ATTACK;
 	//return;
 	//}
-	// Reset the grapple if hangin on a grapple node
+	// Reset the grapple if hanging on a grapple node
 	//if(current_node_type == BOTNODE_GRAPPLE)
 	//{
 	//CTFPlayerResetGrapple(self);
@@ -396,64 +448,75 @@ void KOOGLEMV_Move(edict_t *self, usercmd_t *ucmd)
 	if (next_node_type == BOTNODE_JUMP ||
 		(current_node_type == BOTNODE_JUMP && next_node_type != BOTNODE_ITEM && nodes[self->next_node].origin[2] > self->s.origin[2]))
 	{
+		self->is_jumping = true;
 		// Set up a jump move
 		ucmd->forwardmove = 400;
 		ucmd->upmove = 400;
-
 		KOOGLEMV_ChangeBotAngle(self);
-
 		VectorCopy(self->move_vector, dist);
 		VectorScale(dist, 440, self->velocity);
-
 		return;
 	}
-	else
-	if (next_node_type == BOTNODE_JUMP ||
-		(current_node_type == BOTNODE_JUMP && next_node_type == BOTNODE_ITEM && nodes[self->next_node].origin[2] > self->s.origin[2]))
-	{
-		// Set up a jump move
-		ucmd->forwardmove = 400;
-		ucmd->upmove = 400;
-
-		KOOGLEMV_ChangeBotAngle(self);
-
-		VectorCopy(self->move_vector, dist);
-		VectorScale(dist, 440, self->velocity);
-
-		return;
-	}
-
 
 	////////////////////////////////////////////////////////
 	// Crouch to Nodes
 	///////////////////////////////////////////////////////
-	if (next_node_type == BOTNODE_CROUCH ||
-		(current_node_type == BOTNODE_CROUCH && next_node_type != BOTNODE_ITEM && nodes[self->next_node].origin[2] > self->s.origin[2]))
-	{
+	//if (next_node_type == BOTNODE_CROUCH ||
+	//	(current_node_type == BOTNODE_CROUCH && next_node_type != BOTNODE_ITEM && nodes[self->next_node].origin[2] > self->s.origin[2]))
+	//{
 		// Set up a jump move
-		ucmd->forwardmove = 400;
-		ucmd->upmove = -400;
+		//ucmd->forwardmove = 400;
+		//ucmd->upmove = -400;
+		//return;
 
-		KOOGLEMV_ChangeBotAngle(self);
+	    //if (current_node_type == BOTNODE_CROUCH || next_node_type == BOTNODE_CROUCH)
+	    //{
+		 //  ucmd->upmove = -400;
+	    //}
 
-		VectorCopy(self->move_vector, dist);
-		VectorScale(dist, 440, self->velocity);
-		return;
-	}
-	else
-		if (next_node_type == BOTNODE_CROUCH ||
-			(current_node_type == BOTNODE_CROUCH && next_node_type == BOTNODE_ITEM && nodes[self->next_node].origin[2] > self->s.origin[2]))
+		if (next_node_type == BOTNODE_CROUCH && nodes[self->next_node].origin[2] > self->s.origin[2])
 		{
-			// Set up a jump move
-			ucmd->forwardmove = 400;
-			ucmd->upmove = -400;
+			c = random();
 
-			KOOGLEMV_ChangeBotAngle(self);
+			if (c < 0.2 && KOOGLEMV_CanMove(self, MOVE_LEFT))
+			{
+				ucmd->sidemove -= 400;
+				ucmd->upmove = -400;
+				// is it a crouching node?
+				if (self->maxs[2] > DUCKING_MAX_Z)
+					self->maxs[2] = DUCKING_MAX_Z;
+				return;
+			}
+			else if (c < 0.4 && KOOGLEMV_CanMove(self, MOVE_RIGHT))
+			{
+				ucmd->sidemove += 400;
+				ucmd->upmove = -400;
+				// is it a crouching node?
+				if (self->maxs[2] > DUCKING_MAX_Z)
+					self->maxs[2] = DUCKING_MAX_Z;
+				return;
+			}
+			if (c < 0.6 && KOOGLEMV_CanMove(self, MOVE_FORWARD))
+			{
+				ucmd->forwardmove += 400;
+				ucmd->upmove = -400;
+				// is it a crouching node?
+				if (self->maxs[2] > DUCKING_MAX_Z)
+					self->maxs[2] = DUCKING_MAX_Z;
+				return;
+			}
+			else if (c < 0.8 && KOOGLEMV_CanMove(self, MOVE_FORWARD))
+			{
+				ucmd->forwardmove = 400;
+				ucmd->upmove = -400;
+				// is it a crouching node?
+				if (self->maxs[2] > DUCKING_MAX_Z)
+					self->maxs[2] = DUCKING_MAX_Z;
+				return;
+			}
 
-			VectorCopy(self->move_vector, dist);
-			VectorScale(dist, 440, self->velocity);
-			return;
 		}
+	//}
 
 	////////////////////////////////////////////////////////
 	// Ladder Nodes
@@ -465,9 +528,7 @@ void KOOGLEMV_Move(edict_t *self, usercmd_t *ucmd)
 		self->velocity[2] = 320;
 
 		KOOGLEMV_ChangeBotAngle(self);
-
 		return;
-
 	}
 	// If getting off the ladder
 	if (current_node_type == BOTNODE_LADDER && next_node_type != BOTNODE_LADDER &&
@@ -573,7 +634,7 @@ void KOOGLEMV_Wander(edict_t *self, usercmd_t *ucmd)
 		ucmd->forwardmove = 300;
 	}
 	else
-		self->client->next_drown_time = 0; // probably shound not be messing with this, but
+		self->client->next_drown_time = 0; // probably should not be messing with this, but
 
 	////////////////////////////////
 	// Lava?
